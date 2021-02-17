@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YTAudio</title>
+    <link id="favicon" rel="icon" type="image/png" href="/favicon.ico"/>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <style>
+        .PlayerContainer{
+            display: block;
+            /*background-color: #f1f3f4;*/
+            /*background-color: #2d2d2e;*/
+            background-color: rgb(63, 63, 63);
+            justify-items: center;
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            height: 130px;
+            width: 100%;
+        }
+        .PlayerBox {
+            display: flex;
+        }
+        .PlayerMediaInfoBox {
+            display: flex;
+            width: 100%;
+            height: 90%;
+            align-items: center;
+            justify-content: center;
+        }
+        .PlayerMediaThumbnailBox {
+            display: flex;
+            width: 101px;
+            align-items: center;
+            justify-items: center;
+            margin-left: 5px;
+        }
+        .PlayerMediaBox {
+            display: block;
+            width: 100%;  
+            text-align: center;
+            justify-content: center;
+        }
+        .PlayerProgressBarBack{
+            display: flex;
+            align-items: center;
+            background-color: lightgrey;
+            width: 80%;
+            height: 15px;
+            cursor: pointer;
+        }
+        .PlayerProgressBar{
+            background-color: #007bff;
+            height: 100%;
+            width: 0%;
+        }
+        .PlayerDuration {
+            display: flex;
+            margin-left: 5px;
+            margin-right: 5px;
+        }
+        .PlayerButtonActive{
+            color: #007bff;
+        }
+
+        .PlaylistContainer {
+            position: fixed;
+            top: 150px;
+            display: block;
+            height: 85%;
+            width: 100%;
+            overflow-y: scroll;
+        }
+        .PlaylistItemContainer {
+            display: block;
+            max-height: 5%;
+            width: 99%;
+        }
+        .PlaylistItemBox {
+            display: flex;
+            max-height: 150px;
+            width: 100%;
+            margin: 5px;
+        }
+        .PlaylistItemMediaInfoBox {
+            display: flex;
+            width: 100%;
+        }
+        .PlaylistItemMediaThumbnailBox {
+            display: flex;
+            width: 101px;
+            align-items: center;
+            justify-items: center;
+        }
+        .PlaylistItemMediaBox {
+            display: block;
+            width: 100%;  
+            text-align: center;
+            justify-content: center;
+        }
+
+        .PlayingItem {
+            background-color: rgb(63, 63, 63);
+        }
+
+        @media only screen and (max-width: 600px) {
+            .PlaylistContainer {
+                position: fixed;
+                top: 130px;
+                display: block;
+                height: 80%;
+                width: 100%;
+                overflow-y: scroll;
+            }
+        }
+    </style>
+</head>
+
+<body style="background-color: black;" class="text-white">
+    <div id="getInfoCol" style="display: block;">
+        <div class="container h-100">
+            <div class="row d-flex h-100 justify-content-center align-items-center">
+                <div style="display: block;" class="col-md-12 text-center">
+                    <h1 class="display-4">YTAudio</h1>
+                    <form>
+                        <div class="form-group">
+                            <label class="text-muted lead">Enter YouTube Url (Video or Playlist)</label>
+                            <input type="text" id="videoUrl" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" type="button" id="getInfoBtn" style="width: 150px;">Get Info</button>
+                        </div>
+                    </form>
+                    <label class="text-muted lead">Created by Juan P. Medina</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="playerCol" style="display: none;">
+        <div id="playerContainer" class="PlayerContainer">
+            <div class="PlayerBox">
+                <div class="PlayerMediaInfoBox">
+                    <div class="PlayerMediaThumbnailBox">
+                        <img id="videoThumbnail" alt="" width="100px" src="">
+                    </div>
+                    <div class="PlayerMediaBox text-black">
+                        <div><label id="videoTitle" style="word-wrap: break-word;"></label></div>
+                        <div><small class="text-muted" id="videoAuthor"></small></div>
+                    </div>
+                </div>
+            </div>
+            <div class="play-icons align-items-center d-flex justify-content-center" style="margin-top: 20px;">
+                <li id="butPrev" class="material-icons ml-1">skip_previous</li>
+                <li id="butPlay" class="material-icons ml-1">play_arrow</li>
+                <li id="butPause" class="material-icons ml-1" style="display: none;">pause</li>
+                <div id="durationDiv" class="PlayerDuration">
+                    <div id="durationCurrent">00:00</div>
+                    <div>/</div>
+                    <div id="durationTotal">00:00</div>
+                </div>
+                <div id="PlayerProgressBarBack" class="PlayerProgressBarBack">
+                    <div id="PlayerProgressBar" class="PlayerProgressBar"></div>
+                </div>
+                <audio id="videoAudio" autoplay="true"></audio>
+                <li id="butNext" class="material-icons ml-1">skip_next</li>
+                <li id="butShuffle" class="material-icons ml-1">shuffle</li>
+            </div>
+        </div>
+    </div>
+    <div id="playlistCol" style="display: none;" class="PlaylistContainer">
+        <div id="playlistContainer">
+        </div>
+    </div>
+    <script>
+        if (location.protocol !== 'https:') {
+            location.replace('https:' + location.href.substring(location.protocol.length));
+        }
+        const serverAddress = "jpmytaudio.herokuapp.com" //"localhost:4000" //
+        const qryStr = window.location.search
+        var isSingle = false;
+        var isPlayerLoaded = false;
+        var prevButton = document.getElementById('butPrev');
+        var nextButton = document.getElementById('butNext');
+        var playButton = document.getElementById('butPlay');
+        var pauseButton = document.getElementById('butPause');
+        var shuffleButton = document.getElementById('butShuffle');
+        var audioObj = document.getElementById('videoAudio');
+        var inputUrl = undefined
+        var playlistResponse = undefined
+        var playlistResponseOrig = undefined
+        var currentItemIndex = 0;
+        var currentItemInfo = undefined
+        var isShuffleActive = false;
+
+        document.getElementById('favicon').setAttribute('href',"https://" + serverAddress + "/favicon.ico");
+
+        function getQueryVariable(variable)
+        {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            if (vars.length > 1){
+                for (var i=0;i<vars.length;i++) {
+                        var pair = vars[i].split("=");
+                        if(pair[0] == variable){return pair[1];}
+                }
+            }
+            else {
+                if(vars[0].substr(0,variable.length + 1) === (variable + '=')){
+                    return vars[0].substr(variable.length + 1);
+                }
+            }
+            return null;
+        }
+        function checkAudio() {
+            if(audioObj.error !== null){
+                moveNext()
+            }
+        }
+
+        function pauseAudio () {
+            audioObj.pause()
+        };
+
+        function playAudio () {
+            audioObj.play()
+            setTimeout(checkAudio, 2000)
+        };
+
+        function getDrationInSecs(x) {
+            var arr = x.split(':');
+            var result = 0;
+            if (arr.length === 1){
+                return x
+            }
+            if (arr.length === 2){
+                result = ((+arr[0]) * 60 + (+arr[1])); 
+            }
+            if (arr.length === 3){
+                result = ((+arr[0]) * 60 * 60 + (+arr[1]) * 60 + (+arr[2])); 
+            }
+            return result
+        }
+
+        function shuffleList(){
+            console.log("Shuffle button pressed");
+            if (isShuffleActive){
+                playlistResponse.data.playlist.items = Array.from(playlistResponseOrig);
+                populatePlaylist();
+                isShuffleActive = false;
+                shuffleButton.className = shuffleButton.className.replace(" PlayerButtonActive","");
+                return;
+            }
+            var totalItems = playlistResponse.data.playlist.items.length;
+            var indexShuffled = new Map();
+            var newList = new Array(totalItems);
+            var curIndex = 1;
+            newList[0] = playlistResponse.data.playlist.items[currentItemIndex];
+            indexShuffled.set(0,0);
+            while(curIndex < totalItems){
+                i = Math.floor(Math.random() * Math.floor(totalItems));
+                if (indexShuffled.get(i) === undefined){
+                    newList[curIndex] = playlistResponse.data.playlist.items[i];
+                    indexShuffled.set(i,i);
+                    curIndex++;
+                }
+            }
+            playlistResponse.data.playlist.items = newList
+
+            populatePlaylist();
+            shuffleButton.className = shuffleButton.className + " PlayerButtonActive";
+            isShuffleActive = true;
+        }
+
+        function setCurrentInfo(item){
+            var newObj = {
+                thumbnail:item.bestThumbnail.url,
+                videoId:item.id,
+                author:item.author.name,
+                title:item.title,
+                duration:item.duration,
+                durationInSecs:getDrationInSecs(item.duration)
+            }
+            currentItemInfo = newObj
+            initializePlayer()
+        }
+
+        function moveNext() {
+            console.log("NextButton Pressed")
+            if (playlistResponse.data.playlist.items.length > (currentItemIndex + 1)){
+                pauseAudio()
+                clearPlayer()
+                clearActive()
+                currentItemInfo = undefined
+                currentItemIndex++
+                setCurrentInfo(playlistResponse.data.playlist.items[currentItemIndex])
+            }
+            else {
+                console.log("No more items, going back to the beginning")
+                currentItemIndex = -1
+                moveNext()
+            }
+            playAudio()
+        }
+
+        function movePrev() {
+            console.log("PrevButton Pressed")
+            if (currentItemIndex == 0){
+                return
+            }
+            playAudio()
+            clearPlayer()
+            clearActive()
+            currentItemInfo = undefined
+            currentItemIndex--
+            setCurrentInfo(playlistResponse.data.playlist.items[currentItemIndex])
+        }
+
+        function clearActive () {
+            if(currentItemInfo !== undefined){
+                var currentItemObj = document.getElementById(currentItemInfo.videoId)
+                currentItemObj.className = "PlaylistItemContainer"
+            }
+        }
+
+        function toggleViews () {
+            if (!isPlayerLoaded){
+                document.querySelector("#getInfoCol").style.display = "none"
+                document.querySelector("#playerCol").style.display = "block"
+                document.querySelector("#playlistCol").style.display = "block"
+                isPlayerLoaded = true
+            }
+        }
+
+        function clearPlayer () {
+            document.querySelector("#videoThumbnail").src = ""
+            document.querySelector("#videoTitle").textContent = ""
+            document.querySelector("#videoAuthor").textContent = ""
+            document.querySelector("#durationCurrent").textContent = "00:00"
+            document.querySelector("#durationTotal").textContent = "00:00"
+            document.querySelector("#PlayerProgressBar").style.width = "0%"
+            
+
+            if ('mediaSession' in navigator) {
+
+                navigator.mediaSession.metadata = null
+            }
+        }
+
+        function loadPlayer() {
+            var isList = parseVideoUrl()
+            if (isList){
+                console.log("the URL is a list")
+                getPlaylistInfo()
+            }
+            else {
+                getVideoInfo(inputUrl)
+                isSingle = true
+            }
+        }
+
+        document.querySelector("#getInfoBtn").addEventListener('click',loadPlayer)
+
+        function toggleInfoBtnSpinner () {
+            const btn = document.querySelector("#getInfoBtn")
+            const spinner = btn.querySelector("#infoSpinner")
+
+            if (spinner == null) {
+                btn.innerHTML = '<span id="infoSpinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Get Info'
+            } else {
+                spinner.remove()
+                btn.innerHTML = 'Get Info'
+            }
+            btn.disabled = !btn.disabled
+        }
+
+        function parseVideoUrl () {
+            try {
+                toggleInfoBtnSpinner()
+                inputUrl = document.querySelector("#videoUrl").value
+                if (inputUrl.length <= 0) {
+                    alert("Please enter a valid url")
+                    return;
+                }
+                
+                if(inputUrl.includes('/watch?')){
+                    return false
+                }
+                if (inputUrl.includes('playlist?list=')){
+                    return true
+                }
+                return false
+            } catch (error) {
+                console.log('error ==>', error);
+                alert('Failed to get video info')
+                return false
+            }
+        }
+
+        function initializePlayer () {
+            if(currentItemInfo !== undefined){
+                clearPlayer();
+                const thumbnail = currentItemInfo.thumbnail.split("?")[0]
+                document.querySelector("#videoThumbnail").src = thumbnail
+                document.querySelector("#videoAudio").src = 'https://' + serverAddress + '/stream/' + currentItemInfo.videoId
+                document.querySelector("#videoTitle").textContent = currentItemInfo.title
+                document.querySelector("#videoAuthor").textContent = currentItemInfo.author
+                document.querySelector("#durationTotal").textContent = currentItemInfo.duration
+                document.querySelector("#PlayerProgressBar").style.width = "0%"
+
+                if ('mediaSession' in navigator) {
+
+                    navigator.mediaSession.metadata = new window.MediaMetadata({
+                        title: currentItemInfo.title,
+                        artist: currentItemInfo.author,
+                        artwork: [
+                            {
+                                src: thumbnail,
+                                sizes: '480x360', // HeightxWidth
+                                type: 'image/png'
+                            }
+                        ]
+                    });
+                }
+                var CurrentItemObj = document.getElementById(currentItemInfo.videoId)
+                CurrentItemObj.className = CurrentItemObj.className + " PlayingItem"
+                CurrentItemObj.scrollIntoView();
+                setTimeout(playAudio,500)
+            }
+            else {
+                console.log("CurrentItem is undefined still")
+                setTimeout(initializePlayer,500)
+            }
+        }
+
+        function newPlaylistItem (item, index) {
+            var itemHtml = '<div class="PlaylistItemBox">' +
+                                '<div class="PlaylistItemMediaInfoBox">' +
+                                    '<div class="PlaylistItemMediaThumbnailBox">' +
+                                        '<img id="' + item.id + '_videoThumbnail" width="100px" src="' + item.bestThumbnail.url + '" alt="">' +
+                                    '</div>' +
+                                    '<div class="PlaylistItemMediaBox">' +
+                                        '<div><label id="' + item.id +'_videoTitle">' + item.title + '</label></div>' +
+                                        '<div><small class="text-muted" id="' + item.id + '_videoAuthor">' + item.author.name + '</small></div>' +
+                                        '<div><label id="' + item.id + '_duration">' + item.duration + '</label></div>' +
+                                    '</div>' +
+                                '</div>' +
+                            '</div>'
+
+            var itemDiv = document.createElement("div");
+            itemDiv.id = item.id
+            itemDiv.className = "PlaylistItemContainer"
+            itemDiv.innerHTML = itemHtml
+            itemDiv.addEventListener("click",function(){
+                currentItemIndex = index - 1
+                moveNext()
+            });
+            return itemDiv
+        }
+
+        function populateSingleVideo () {
+            if (currentItemInfo !== undefined){
+                toggleViews()
+                var itemObj = {
+                    id:currentItemInfo.videoId,
+                    duration: currentItemInfo.duration,
+                    title:currentItemInfo.title,
+                    author: {
+                        name: currentItemInfo.author
+                    },
+                    bestThumbnail: {
+                        url: currentItemInfo.thumbnail
+                    }
+                }
+                var listContainer = document.getElementById('playlistContainer')
+                listContainer.innerHTML = "";
+                var newItemDOM = newPlaylistItem(itemObj,0)
+                listContainer.appendChild(newItemDOM)
+            }
+            else {
+                console.log("ERROR: Playlist is not defined")
+            }
+        }
+
+        function setPrevNextVisible () {
+            if (isSingle){
+                prevButton.style.display = "none"
+                nextButton.style.display = "none"
+                shuffleButton.style.display = "none"
+            }
+            else {
+                prevButton.style.display = "block"
+                nextButton.style.display = "block"
+                shuffleButton.style.display = "block"
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.setActionHandler('previoustrack', function() {
+                        movePrev()
+                    });
+                    navigator.mediaSession.setActionHandler('nexttrack', function() {
+                        moveNext()
+                    });
+                }
+            }
+        }
+
+        function populatePlaylist() {
+            if (playlistResponse !== undefined){
+                toggleViews();
+                var listContainer = document.getElementById('playlistContainer');
+                listContainer.innerHTML = "";
+                for (var i = 0; i < playlistResponse.data.playlist.items.length; i++){
+                    var newItemDOM = newPlaylistItem(playlistResponse.data.playlist.items[i],i)
+                    listContainer.appendChild(newItemDOM)
+                }
+                currentItemIndex = -1
+                moveNext()
+                setPrevNextVisible()
+            }
+            else {
+                console.log("ERROR: Playlist is not defined")
+            }
+        }
+
+        function getVideoInfo (videoUrl) {
+            try {
+                if (videoUrl.length <= 0) {
+                    alert("Please enter a valid url")
+                    return;
+                }
+
+                fetch('https://' + serverAddress + '/info?url=' + videoUrl)
+                        .then(function(x){return x.json()})
+                        .then(function(data) {
+                            if (data.success) {
+                                currentItemInfo = data.data
+                                if(isSingle){
+                                    populateSingleVideo()
+                                }
+                                setPrevNextVisible()
+                                initializePlayer()
+                            } else {
+                                throw new Error()
+                            }
+                        })
+                        return
+            } catch (error) {
+                console.log('error ===>', error);
+                alert('Failed to get video info')
+                return
+            }
+        }
+
+        function getPlaylistInfo () {
+            try {
+                const videoUrl = document.querySelector("#videoUrl").value 
+                if (videoUrl.length <= 0) {
+                    alert("Please enter a valid url")
+                    return;
+                }
+                fetch('https://' + serverAddress + '/playlist?url=' + videoUrl)
+                        .then(function(x){return x.json()})
+                        .then(function(data) {
+                            playlistResponse = data
+                            playlistResponseOrig = Array.from(data.data.playlist.items)
+                            if (data.success) {
+                                populatePlaylist()
+                            } else {
+                                console.log("ERROR: " + data.success)
+                            }
+                        })
+            } catch (error) {
+                console.log('error -==>', error);
+                alert('Failed to get video info')
+            }
+        }
+
+        playButton.addEventListener("click",playAudio);
+        pauseButton.addEventListener("click",pauseAudio);
+        nextButton.addEventListener('click',moveNext);
+        prevButton.addEventListener('click',movePrev);
+        shuffleButton.addEventListener('click',shuffleList);
+
+        audioObj.addEventListener('play',function() {
+            pauseButton.style.display = "block";
+            playButton.style.display = "none";
+        });
+        audioObj.addEventListener('pause',function() {
+            pauseButton.style.display = "none";
+            playButton.style.display = "block";
+        });
+        audioObj.addEventListener("ended", function() {
+            if (isSingle){
+                isPlaying = false;
+                return    
+            }
+            setTimeout(moveNext,500)
+        });
+        audioObj.addEventListener("timeupdate",function() {
+            if (audioObj.currentTime > currentItemInfo.durationInSecs){
+                moveNext()
+            }
+            else {
+                var currentTime = new Date(0,0,0)
+                currentTime.setSeconds(audioObj.currentTime)
+                var timeStr = currentTime.toTimeString().substr(0,8)
+                if (timeStr.startsWith("00:")){
+                    timeStr = timeStr.substr(3)
+                }
+                document.querySelector("#durationCurrent").textContent = timeStr
+                document.querySelector("#PlayerProgressBar").style.width = parseInt(((audioObj.currentTime / currentItemInfo.durationInSecs) * 100), 10) + "%";
+                updateMediaSessionPosition();
+            }
+        });
+
+        function updateMediaSessionPosition(){
+            try {
+                if ('setPositionState' in navigator.mediaSession) {
+                    //console.log("updating position to " + audioObj.currentTime);
+                    navigator.mediaSession.setPositionState({
+                        duration: currentItemInfo.durationInSecs,
+                        playbackRate: 1.0,
+                        position: audioObj.currentTime
+                    });
+                }
+            }
+            catch(e) {
+                console.log("Browser doesn't support mediaSession's setPositionState")
+            }
+        }
+
+        document.querySelector("#PlayerProgressBarBack").addEventListener('click', function(e) {
+            var clickPosition = (e.pageX  - document.querySelector("#PlayerProgressBarBack").offsetLeft) / document.querySelector("#PlayerProgressBarBack").offsetWidth;
+            var clickTime = clickPosition * currentItemInfo.durationInSecs;
+            audioObj.currentTime = clickTime;
+        });
+
+        if (qryStr.length > 1){
+            if(getQueryVariable('url') !== null)
+            {
+                document.querySelector("#videoUrl").value = getQueryVariable('url').replace('%3F','?');
+                loadPlayer()
+            }
+        }
+        try {
+            navigator.mediaSession.setActionHandler('play', playAudio);
+            navigator.mediaSession.setActionHandler('pause', pauseAudio);
+        }
+        catch(e) {
+            console.log("Browser doesn't support mediaSession")
+        }
+    </script>
+</body>
+
+</html>
